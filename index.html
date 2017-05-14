@@ -1,0 +1,251 @@
+<!doctype html>
+<html>
+  <head>
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <title>Spheron</title>
+    <style>
+      body {
+        background: linear-gradient(141deg, #0fb8ad 0%, #1fc8db 51%, #2cb5e8 75%);
+      }
+      .buttons {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 20px;
+        margin-bottom: 10px;
+      }
+      form {
+        margin-left: 10px;
+        margin-right: 10px;
+      }
+      #canvasDiv {
+        margin: 10px 50px 10px 50px;
+        background: white;
+        box-shadow: 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22);
+      }
+      #clear {
+        margin-left: 9px;
+      }
+      #hackBtn {
+        opacity: 0;
+      }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+  </head>
+  <body>
+    <div class="nav">
+      <div class="buttons">
+        <form class="" action="/disconnect" method="post">
+          <button type="submit" class="btn btn-danger">Disconnect</button>
+        </form>
+
+        <form class="" action="/startCalibration" method="post">
+          <button type="submit" class="btn btn-primary">Start Calibration</button>
+        </form>
+
+        <form class="" action="/finishCalibration" method="post">
+          <button type="submit" class="btn btn-success">Finish Calibration</button>
+        </form>
+
+        <button id="clear" class="btn btn-warning">Clear</button>
+      </div>
+    </div>
+
+    <div id="canvasDiv"></div>
+
+    <script
+      src="https://code.jquery.com/jquery-3.2.1.min.js"
+      integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+      crossorigin="anonymous">
+    </script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="text/javascript">
+      var socket = io();
+      $(document).keydown(function(e) {
+        switch (e.which) {
+          case 37:
+            socket.emit('keydown left');
+            break;
+          case 38:
+            socket.emit('keydown up');
+            break;
+          case 39:
+            socket.emit('keydown right');
+            break;
+          case 40:
+            socket.emit('keydown down');
+            break;
+          default:
+        }
+      });
+    </script>
+    <script type="text/javascript">
+      var canvasDiv = document.getElementById('canvasDiv');
+      var width = 1800, height = 850;
+      canvas = document.createElement('canvas');
+      canvas.setAttribute('id', 'canvas');
+      canvas.setAttribute('width', width);
+      canvas.setAttribute('height', height);
+      canvasDiv.appendChild(canvas);
+      if (typeof G_vmlCanvasManager != 'undefined') {
+        canvas = G_vmlCanvasManager.initElement(canvas);
+      }
+      context = canvas.getContext("2d");
+
+      $('#canvas').mousedown(function (e) {
+        var mouseX = e.pageX - this.offsetLeft;
+        var mouseY = e.pageY - this.offsetTop;
+
+        paint = true;
+        addClick(e.pageX - this.offsetLeft, e.pageY - this.offsetTop);
+        redraw();
+      });
+
+      $('#canvas').mousemove(function (e) {
+        if (paint) {
+            addClick(e.pageX - this.offsetLeft, e.pageY - this.offsetTop, true);
+            redraw();
+        }
+      });
+
+      $('#canvas').mouseup(function (e) {
+        paint = false;
+      });
+
+      $('#canvas').mouseleave(function (e) {
+        paint = false;
+      });
+
+      var clickX = new Array();
+      var clickY = new Array();
+      var clickDrag = new Array();
+      var paint;
+
+      function addClick(x, y, dragging) {
+        clickX.push(x);
+        clickY.push(y);
+        clickDrag.push(dragging);
+      }
+
+      function redraw() {
+        context.clearRect(0, 0, context.canvas.width, context.canvas.height); // Clears the canvas
+
+        context.strokeStyle = "#000";
+        context.lineJoin = "round";
+        context.lineWidth = 5;
+
+        for (var i = 0; i < clickX.length; i++) {
+            context.beginPath();
+            if (clickDrag[i] && i) {
+                context.moveTo(clickX[i - 1], clickY[i - 1]);
+            } else {
+                context.moveTo(clickX[i] - 1, clickY[i]);
+            }
+            context.lineTo(clickX[i], clickY[i]);
+            context.closePath();
+            context.stroke();
+        }
+      }
+
+      var xFrom = width/2, yFrom = height/2;
+      var isDrawing = true;
+      $(document).keydown(function(e) {
+        switch (e.which) {
+          case 32:
+            e.preventDefault();
+            isDrawing = !isDrawing;
+        }
+      });
+
+      function clearCanvas() {
+        clickX = new Array();
+        clickY = new Array();
+        clickDrag = new Array();
+        context.clearRect(0, 0, width, height);
+
+        xFrom = width/2, yFrom = height/2;
+      }
+
+      $('#clear').click(function () {
+        clearCanvas();
+      });
+
+      var socket = io();
+
+      socket.on('canvas clear', function() {
+        clearCanvas();
+      });
+      // socket.on('velocity', function(data) {
+      //   if (isDrawing) {
+      //     var x = data.xVelocity.value[0];
+      //     var y = data.yVelocity.value[0];
+      //     console.log('x: ', x);
+      //     console.log('y: ', y);
+      //     context.beginPath();
+      //     context.moveTo(xFrom, yFrom);
+      //     if (xFrom - x >= width) {
+      //       xFrom = width;
+      //     } else if (xFrom - x <= 0) {
+      //       xFrom = 10;
+      //     }else {
+      //       xFrom -= x;
+      //     }
+      //
+      //     if (yFrom + y >= height) {
+      //       yFrom = height;
+      //     } else if (yFrom + y <= 0){
+      //       yFrom = 10;
+      //     } else {
+      //       yFrom += y;
+      //     }
+      //     context.lineTo(xFrom, yFrom);
+      //     context.stroke();
+      //
+      //   }
+
+      socket.on('gyroscope', function(data) {
+        if (isDrawing) {
+          var y = -(data.xGyro.value[0] * 0.15);
+          var x = -(data.yGyro.value[0] * 0.15);
+          console.log('x: ', x);
+          console.log('y: ', y);
+
+          var xtaboo = (x < 5 && x > -5) || (x > 300 || x < -300);
+          var ytaboo = (y < 5 && y > -5) || (y > 300 || y < -300);
+
+          if (!xtaboo && !ytaboo) {
+              context.beginPath();
+              context.moveTo(xFrom, yFrom);
+              if (xFrom + x >= width) {
+                xFrom = width;
+              } else if (xFrom + x <= 0) {
+                xFrom = 10;
+              } else {
+                xFrom += x;
+              }
+
+              if (yFrom + y >= height) {
+                yFrom = height;
+              } else if (yFrom + y <= 0){
+                yFrom = 10;
+              } else {
+                yFrom += y;
+              }
+              context.lineTo(xFrom, yFrom);
+              context.stroke();
+          }
+
+        }
+      });
+
+      // socket.on('imuAngles', function(data) {
+      //   console.log("pitch: " + data.pitchAngle.value[0]);
+      //   console.log("roll: "  + data.rollAngle.value[0]);
+      //   console.log("taw: " + data.yawAngle.value[0]);
+      // });
+
+
+    </script>
+  </body>
+</html>
